@@ -31,6 +31,7 @@ class cached_ifstream
     void open(const std::string &filename, uint64_t cacheSize)
     {
         this->cur_off = 0;
+        this->pos_cache = 0;
 
         try
         {
@@ -91,12 +92,58 @@ class cached_ifstream
             uint64_t size_left = fsize - reader.tellg();
 
             if (size_left >= cache_size)
-            {
+            {   
+                pos_cache = static_cast<uint64_t>(reader.tellg());
                 reader.read(cache_buf, cache_size);
                 cur_off = 0;
             }
             // note that if size_left < cache_size, then cur_off = cache_size,
             // so subsequent reads will all be directly from file
+        }
+    }
+
+    std::streampos tellg(){
+        return reader.tellg();
+    }
+
+    void seekg(std::streampos pos){
+        uint64_t _pos = static_cast<uint64_t>(pos);
+        if(_pos < 0 || _pos >= this->fsize){
+            std::stringstream stream;
+            stream << "seekg should use a file position no lower than 0, but lower than file size" << std::endl;
+            stream << "current position given: " << _pos << ", file size: " << this->fsize << std::endl;
+            diskann::cout << stream.str() << std::endl;
+            throw diskann::ANNException(stream.str(), -1, __FUNCSIG__, __FILE__, __LINE__);
+        }
+        if (_pos < this->pos_cache){
+            reader.seekg(pos);
+            
+            uint64_t size_left = fsize - _pos;
+            if (size_left >= cache_size)
+            {   
+                reader.read(cache_buf, cache_size);
+                cur_off = 0;
+                pos_cache = _pos;
+            } else{
+                cur_off = cache_size;
+            }
+            
+        }
+        else if (_pos < this->pos_cache + cache_size){
+            cur_off = _pos - this->pos_cache;
+        } 
+        else{
+            reader.seekg(pos);
+
+            uint64_t size_left = fsize - _pos;
+            if (size_left >= cache_size)
+            {   
+                reader.read(cache_buf, cache_size);
+                cur_off = 0;
+                pos_cache = _pos;
+            } else{
+                cur_off = cache_size;
+            }
         }
     }
 
@@ -111,6 +158,8 @@ class cached_ifstream
     uint64_t cur_off = 0;
     // file size
     uint64_t fsize = 0;
+    // the start byte of current cache
+    uint64_t pos_cache = 0;
 };
 
 // sequential cached writes
@@ -163,7 +212,7 @@ class cached_ofstream
         return fsize;
     }
     // writes n_bytes from write_buf to the underlying ofstream/cache
-    void write(char *write_buf, uint64_t n_bytes)
+    void write(const char *write_buf, uint64_t n_bytes)
     {
         assert(cache_buf != nullptr);
         if (n_bytes <= (cache_size - cur_off))
@@ -201,6 +250,15 @@ class cached_ofstream
         flush_cache();
         writer.seekp(0);
     }
+
+    // std::streampos tellp(){
+    //     return writer.tellp();
+    // }
+
+    // void seekg(std::streampos pos){
+    //     flush_cache();
+    //     writer.seekp(pos);
+    // }
 
   private:
     // underlying ofstream

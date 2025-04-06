@@ -47,6 +47,11 @@ void compute_closest_centers(float *data, size_t num_points, size_t dim, float *
                              size_t k, uint32_t *closest_centers_ivf, std::vector<size_t> *inverted_index = NULL,
                              float *pts_norms_squared = NULL);
 
+void compute_closest_centers_return_distance(float *data, size_t num_points, size_t dim, float *pivot_data, size_t num_centers,
+                                            size_t k, uint32_t *closest_centers_ivf, float *distance_matrix,
+                                            std::vector<size_t> *inverted_index,
+                                            float *pts_norms_squared);
+
 // if to_subtract is 1, will subtract nearest center from each row. Else will
 // add. Output will be in data_load iself.
 // Nearest centers need to be provided in closst_centers.

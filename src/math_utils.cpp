@@ -203,6 +203,71 @@ void compute_closest_centers(float *data, size_t num_points, size_t dim, float *
         delete[] pts_norms_squared;
 }
 
+
+void compute_closest_centers_return_distance(float *data, size_t num_points, size_t dim, float *pivot_data, size_t num_centers,
+    size_t k, uint32_t *closest_centers_ivf, float *distance_matrix,
+    std::vector<size_t> *inverted_index,
+    float *pts_norms_squared)
+{
+    if (k > num_centers)
+    {
+        diskann::cout << "ERROR: k (" << k << ") > num_center(" << num_centers << ")" << std::endl;
+        return;
+    }
+
+    bool is_norm_given_for_pts = (pts_norms_squared != NULL);
+
+    float *pivs_norms_squared = new float[num_centers];
+    if (!is_norm_given_for_pts)
+        pts_norms_squared = new float[num_points];
+
+    size_t PAR_BLOCK_SIZE = num_points;
+    size_t N_BLOCKS =
+    (num_points % PAR_BLOCK_SIZE) == 0 ? (num_points / PAR_BLOCK_SIZE) : (num_points / PAR_BLOCK_SIZE) + 1;
+
+    if (!is_norm_given_for_pts)
+        math_utils::compute_vecs_l2sq(pts_norms_squared, data, num_points, dim);
+    math_utils::compute_vecs_l2sq(pivs_norms_squared, pivot_data, num_centers, dim);
+    uint32_t *closest_centers = new uint32_t[PAR_BLOCK_SIZE * k];
+    // float *distance_matrix = new float[num_centers * PAR_BLOCK_SIZE];
+    float *distance_matrix_local = new float[num_centers * PAR_BLOCK_SIZE];
+
+    for (size_t cur_blk = 0; cur_blk < N_BLOCKS; cur_blk++)
+    {
+        float *data_cur_blk = data + cur_blk * PAR_BLOCK_SIZE * dim;
+        size_t num_pts_blk = std::min(PAR_BLOCK_SIZE, num_points - cur_blk * PAR_BLOCK_SIZE);
+        float *pts_norms_blk = pts_norms_squared + cur_blk * PAR_BLOCK_SIZE;
+
+        math_utils::compute_closest_centers_in_block(data_cur_blk, num_pts_blk, dim, pivot_data, num_centers,
+                                    pts_norms_blk, pivs_norms_squared, closest_centers,
+                                    distance_matrix_local, k);
+
+        #pragma omp parallel for schedule(static, 1)
+        for (int64_t j = cur_blk * PAR_BLOCK_SIZE;
+            j < std::min((int64_t)num_points, (int64_t)((cur_blk + 1) * PAR_BLOCK_SIZE)); j++)
+        {
+            for (size_t l = 0; l < k; l++)
+            {
+                size_t this_center_id = closest_centers[(j - cur_blk * PAR_BLOCK_SIZE) * k + l];
+                closest_centers_ivf[j * k + l] = (uint32_t)this_center_id;
+                distance_matrix[j * k + l] = distance_matrix_local[(j - cur_blk * PAR_BLOCK_SIZE) * k + l];
+                if (inverted_index != NULL)
+                {
+                    #pragma omp critical
+                    inverted_index[this_center_id].push_back(j);
+                }
+            }
+        }
+    }
+    delete[] closest_centers;
+    // delete[] distance_matrix;
+    delete[] pivs_norms_squared;
+    if (!is_norm_given_for_pts)
+        delete[] pts_norms_squared;
+}
+
+
+
 // if to_subtract is 1, will subtract nearest center from each row. Else will
 // add. Output will be in data_load iself.
 // Nearest centers need to be provided in closst_centers.

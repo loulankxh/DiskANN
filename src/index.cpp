@@ -364,7 +364,7 @@ void Index<T, TagT, LabelT>::save(const char *filename, bool compact_before_save
 
         std::string graph_file = std::string(filename);
         std::string tags_file = std::string(filename) + ".tags";
-        std::string data_file = std::string(filename) + ".data";
+        // std::string data_file = std::string(filename) + ".data";
         std::string delete_list_file = std::string(filename) + ".del";
 
         // Because the save_* functions use append mode, ensure that
@@ -373,8 +373,8 @@ void Index<T, TagT, LabelT>::save(const char *filename, bool compact_before_save
         // delete should succeed if save will succeed.
         delete_file(graph_file);
         save_graph(graph_file);
-        delete_file(data_file);
-        save_data(data_file);
+        // delete_file(data_file);
+        // save_data(data_file);
         delete_file(tags_file);
         save_tags(tags_file);
         delete_file(delete_list_file);

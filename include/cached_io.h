@@ -31,7 +31,6 @@ class cached_ifstream
     void open(const std::string &filename, uint64_t cacheSize)
     {
         this->cur_off = 0;
-        this->pos_cache = 0;
 
         try
         {
@@ -42,6 +41,7 @@ class cached_ifstream
             assert(cacheSize > 0);
             cacheSize = (std::min)(cacheSize, fsize);
             this->cache_size = cacheSize;
+            this->pos_cache = 0;
             cache_buf = new char[cacheSize];
             reader.read(cache_buf, cacheSize);
             diskann::cout << "Opened: " << filename.c_str() << ", size: " << fsize << ", cache_size: " << cacheSize
@@ -130,6 +130,7 @@ class cached_ifstream
             
         }
         else if (_pos < this->pos_cache + cache_size){
+            reader.seekg(this->pos_cache + cache_size);
             cur_off = _pos - this->pos_cache;
         } 
         else{

@@ -262,6 +262,7 @@ void compute_closest_centers_return_distance(float *data, size_t num_points, siz
     delete[] closest_centers;
     // delete[] distance_matrix;
     delete[] pivs_norms_squared;
+    delete[] distance_matrix_local;
     if (!is_norm_given_for_pts)
         delete[] pts_norms_squared;
 }
